@@ -65,7 +65,7 @@ def login_otb(driver, login):
     logger.info("Page successfully requested, delaying until page fully loads.")
     username_element = '//*[@id="username"]'
     password_element = '//*[@id="password"]'
-    button_element = '//*[@id="customer_login"]/div[1]/form/p[3]/button'
+    #button_element = '//*[@id="customer_login"]/div[1]/form/p[3]/button'
     delay(driver, username_element)
 
     user = driver.find_element_by_xpath(username_element)
@@ -76,6 +76,9 @@ def login_otb(driver, login):
     pwd.clear()
     pwd.send_keys(login.get_password())
     pwd.send_keys(u'\ue007')
+
+    # implement confirm that logged in
+    logger.info("Logged in successfully")
 
 
 def delay(driver, item):
