@@ -10,10 +10,20 @@ from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.by import By
 from webdriver_manager.chrome import ChromeDriverManager
 
+# TODO 
+# # implement login
+
+# implement checkout
+
+# implement disc color finder
+
+# implement disc amounts
+
+
 os.environ['WDM_LOG_LEVEL'] = '0'
 logger = logging.getLogger()
 #logging.basicConfig(filename="otb_error.log", encoding='utf-8', level=logging.DEBUG)
-logging.basicConfig(encoding='utf-8', level=logging.DEBUG)
+logging.basicConfig(encoding='utf-8', level=logging.INFO)
 
 class Card:
     def __init__(self, card_number, card_exp_date, csc):
@@ -29,6 +39,7 @@ class Login:
     def __init__(self, email, password):
         self.email = email
         self.password = password
+        self.logged_in = False
     
     def __str__(self):
         return f"Email: {self.email}\nPassword: {self.password}"
@@ -38,6 +49,12 @@ class Login:
 
     def get_username(self):
         return f"{self.email}"
+    
+    def get_login_status(self):
+        return f"{self.logged_in}"
+    
+    def update_login_status(self, logged_in):
+        self.logged_in = logged_in
 
 
 class Disc:
@@ -49,11 +66,40 @@ class Disc:
     def __str__(self):
         return f"URL: {self.disc_url}\n Color: {self.disc_color}\nAmount: {self.disc_amount}"
 
+    def get_disc_url(self):
+        return f"{self.disc_url}"
+
+    def get_disc_color(self):
+        return f"{self.disc_color}"
+    
+    def get_disc_amount(self):
+        return self.disc_amount
+
 
 def start(driver, card, login, disc):
     logger.info("Starting login")
     login_otb(driver, login)
 
+    if login.get_login_status():
+        find_discs(driver, disc)
+
+def find_discs(driver, disc):
+    try:
+        logger.info("Requesting OTB Disc page..")
+        driver.get(disc.get_disc_url())
+    except TimeoutException:
+        logger.error("Timed out waiting for page.")
+
+    logger.info("Page found, delaying until finished loading.")
+    loaded_element = '//*[@id="masthead"]/div[1]/div[1]/a/img'
+    delay(driver, loaded_element)
+
+    amount = disc.get_disc_amount()
+    while amount > 0:
+        add_to_cart = driver.find_element(by=By.CLASS_NAME, value="add_to_cart")
+        add_to_cart.click()
+        amount -= 1
+        sleep(2) # prevent rate limits, allows page to reload. 
 
 def login_otb(driver, login):
     try:
@@ -63,22 +109,27 @@ def login_otb(driver, login):
         logger.error("Timed out waiting for page.")
     
     logger.info("Page successfully requested, delaying until page fully loads.")
+
     username_element = '//*[@id="username"]'
     password_element = '//*[@id="password"]'
-    #button_element = '//*[@id="customer_login"]/div[1]/form/p[3]/button'
+    logged_in_element = '//*[@id="post-7"]/header/h1'
+
     delay(driver, username_element)
 
-    user = driver.find_element_by_xpath(username_element)
+    user = driver.find_element(by=By.XPATH, value=username_element)
     user.clear()
     user.send_keys(login.get_username())
 
-    pwd = driver.find_element_by_xpath(password_element)
+    pwd = driver.find_element(by=By.XPATH, value=password_element)
     pwd.clear()
     pwd.send_keys(login.get_password())
     pwd.send_keys(u'\ue007')
 
-    # implement confirm that logged in
-    logger.info("Logged in successfully")
+    if driver.find_element(by=By.XPATH, value=logged_in_element):
+        login.update_login_status(True)
+        logger.info("Logged in successfully")
+    else:
+        logger.error("Error logging in.")
 
 
 def delay(driver, item):
@@ -86,14 +137,6 @@ def delay(driver, item):
     poll = 0.1
     WebDriverWait(driver, timeout, poll).until(expected_conditions.visibility_of_element_located((By.XPATH, item)))
 
-# TODO
-# implement login
-
-# implement checkout
-
-# implement disc color finder
-
-# implement disc amounts
 
 if __name__ == "__main__":
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()))
